@@ -140,6 +140,7 @@ const PageTemplate = `
 		<td><a href="{{.Link}}">link</a></td>
 		<td>{{.Start}}</td>
 		<td>{{.End}}</td>
+		<td>{{.Weekday}}</td>
 		<td>{{.DeltaStr}}</td>
 		<td>{{.Title}}</td>
 	</tr>
@@ -154,6 +155,7 @@ const PageTemplate = `
 		<td><a href="{{.Link}}">link</a></td>
 		<td>{{.Start}}</td>
 		<td>{{.End}}</td>
+		<td>{{.Weekday}}</td>
 		<td>{{.DeltaStr}}</td>
 		<td>{{.Title}}</td>
 	</tr>
@@ -170,6 +172,7 @@ type HtmlEntry struct {
 	DeltaStr string
 	Delta    int
 	Title    string
+	Weekday  string
 }
 
 type sortedEntries []HtmlEntry
@@ -182,6 +185,16 @@ func (ev sortedEntries) Swap(i, j int) {
 }
 func (ev sortedEntries) Less(i, j int) bool {
 	return ev[i].Delta < ev[j].Delta
+}
+
+var Weekdays = []string{
+	"Di",
+	"Lu",
+	"Ma",
+	"Me",
+	"Je",
+	"Ve",
+	"Sa",
 }
 
 func writeHtml(w io.Writer, events []Event) error {
@@ -217,6 +230,7 @@ func writeHtml(w io.Writer, events []Event) error {
 			DeltaStr: deltaStr,
 			Delta:    delta,
 			Title:    ev.Title,
+			Weekday:  Weekdays[int(baseDate.Weekday())],
 		}
 		if !ev.End.IsZero() {
 			entry.End = ev.End.Format("2006-01-02")
