@@ -147,7 +147,7 @@ const PageTemplate = `
 	{{end}}
 	{{if .HasAfter}}
 </table>
-<hr/>
+<hr id="now"></hr>
 <table>
 	{{end}}
 	{{range .After}}
