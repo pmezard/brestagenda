@@ -197,6 +197,7 @@ func writeHtml(w io.Writer, events []Event) error {
 	}
 
 	now := time.Now()
+	now = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)
 	entries := Entries{}
 	for _, ev := range events {
 		baseDate := ev.Start
