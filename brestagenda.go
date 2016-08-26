@@ -140,7 +140,7 @@ const PageTemplate = `
 		<td><a href="{{.Link}}">link</a></td>
 		<td>{{.Start}}</td>
 		<td>{{.End}}</td>
-		<td>{{.Delta}}</td>
+		<td>{{.DeltaStr}}</td>
 		<td>{{.Title}}</td>
 	</tr>
 	{{end}}
@@ -154,7 +154,7 @@ const PageTemplate = `
 		<td><a href="{{.Link}}">link</a></td>
 		<td>{{.Start}}</td>
 		<td>{{.End}}</td>
-		<td>{{.Delta}}</td>
+		<td>{{.DeltaStr}}</td>
 		<td>{{.Title}}</td>
 	</tr>
 	{{end}}
@@ -163,38 +163,59 @@ const PageTemplate = `
 </html>
 `
 
+type HtmlEntry struct {
+	Link     string
+	Start    string
+	End      string
+	DeltaStr string
+	Delta    int
+	Title    string
+}
+
+type sortedEntries []HtmlEntry
+
+func (ev sortedEntries) Len() int {
+	return len(ev)
+}
+func (ev sortedEntries) Swap(i, j int) {
+	ev[i], ev[j] = ev[j], ev[i]
+}
+func (ev sortedEntries) Less(i, j int) bool {
+	return ev[i].Delta < ev[j].Delta
+}
+
 func writeHtml(w io.Writer, events []Event) error {
-	t, err := template.New("foo").Parse(PageTemplate)
+	t, err := template.New("html").Parse(PageTemplate)
 	if err != nil {
 		return err
 	}
 
-	type Entry struct {
-		Link  string
-		Start string
-		End   string
-		Delta string
-		Title string
-	}
 	type Entries struct {
-		Before   []Entry
-		After    []Entry
+		Before   []HtmlEntry
+		After    []HtmlEntry
 		HasAfter bool
 	}
 
 	now := time.Now()
 	entries := Entries{}
 	for _, ev := range events {
-		delta := int(ev.Start.Sub(now).Hours() / 24)
+		baseDate := ev.Start
+		mult := 1
+		if !ev.Start.After(now) && !ev.End.IsZero() {
+			baseDate = ev.End
+			mult = -1
+		}
+		delta := mult * int(baseDate.Sub(now).Hours()/24)
 		deltaStr := ""
 		if delta != 0 {
 			deltaStr = fmt.Sprintf("%+dj", delta)
 		}
-		entry := Entry{
-			Link:  ev.Link,
-			Start: ev.Start.Format("2006-01-02"),
-			Delta: deltaStr,
-			Title: ev.Title,
+		entry := HtmlEntry{
+			Link:     ev.Link,
+			Start:    ev.Start.Format("2006-01-02"),
+			DeltaStr: deltaStr,
+			Delta:    delta,
+			Title:    ev.Title,
 		}
 		if !ev.End.IsZero() {
 			entry.End = ev.End.Format("2006-01-02")
@@ -205,20 +226,10 @@ func writeHtml(w io.Writer, events []Event) error {
 			entries.Before = append(entries.Before, entry)
 		}
 	}
+	sort.Sort(sortedEntries(entries.Before))
+	sort.Sort(sortedEntries(entries.After))
 	entries.HasAfter = len(entries.Before) > 0 && len(entries.After) > 0
 	return t.Execute(w, &entries)
-}
-
-type sortedEvents []Event
-
-func (ev sortedEvents) Len() int {
-	return len(ev)
-}
-func (ev sortedEvents) Swap(i, j int) {
-	ev[i], ev[j] = ev[j], ev[i]
-}
-func (ev sortedEvents) Less(i, j int) bool {
-	return ev[i].Start.Before(ev[j].Start)
 }
 
 func loadEvents(path string) ([]Event, error) {
@@ -245,7 +256,6 @@ func formatFn() error {
 	if err != nil {
 		return err
 	}
-	sort.Sort(sortedEvents(events))
 	fp, err := os.Create(outPath)
 	if err != nil {
 		return err
