@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,6 +11,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/alecthomas/kingpin"
 )
 
 type Event struct {
@@ -184,20 +184,13 @@ func (ev sortedEvents) Less(i, j int) bool {
 	return ev[i].Start.Before(ev[j].Start)
 }
 
-func crawlAgenda() error {
-	flag.Usage = func() {
-		fmt.Println(`Usage: brestagenda HTMLPATH
+var (
+	crawlCmd     = app.Command("crawl", "crawl brest.fr agenda")
+	crawlPathArg = crawlCmd.Arg("path", "output HTML path").Required().String()
+)
 
-Crawl brest.fr agenda events and generate a static HTML file listing them.
-`)
-		flag.PrintDefaults()
-		os.Exit(1)
-	}
-	flag.Parse()
-	if flag.NArg() < 1 {
-		return fmt.Errorf("output HTML path was not supplied")
-	}
-	outPath := flag.Arg(0)
+func crawlFn() error {
+	outPath := *crawlPathArg
 
 	client := &http.Client{
 		Timeout: 30 * time.Second,
@@ -228,8 +221,21 @@ Crawl brest.fr agenda events and generate a static HTML file listing them.
 	return writeHtml(fp, events)
 }
 
+var (
+	app = kingpin.New("brestagenda", "Crawl and reformat brest.fr agenda")
+)
+
+func dispatch() error {
+	cmd := kingpin.MustParse(app.Parse(os.Args[1:]))
+	switch cmd {
+	case crawlCmd.FullCommand():
+		return crawlFn()
+	}
+	return fmt.Errorf("unknown command: %s", cmd)
+}
+
 func main() {
-	err := crawlAgenda()
+	err := dispatch()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %s\n", err)
 		os.Exit(1)
