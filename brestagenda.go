@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -89,6 +90,42 @@ func getPage(client *http.Client, url, base string) (*Page, error) {
 		Next:   url,
 	}
 	return &page, nil
+}
+
+var (
+	crawlCmd     = app.Command("crawl", "crawl brest.fr agenda")
+	crawlPathArg = crawlCmd.Arg("path", "output JSON path").Required().String()
+)
+
+func crawlFn() error {
+	outPath := *crawlPathArg
+
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+	base := "https://www.brest.fr"
+	path := "/actus-et-agenda/agenda-132.html"
+	events := []Event{}
+	for {
+		url := base + path
+		fmt.Println("GET", url)
+		p, err := getPage(client, url, base)
+		if err != nil {
+			return err
+		}
+		path = p.Next
+		events = append(events, p.Events...)
+		if path == "" {
+			break
+		}
+		fmt.Println(base + path)
+	}
+	fp, err := os.Create(outPath)
+	if err != nil {
+		return err
+	}
+	defer fp.Close()
+	return json.NewEncoder(fp).Encode(&events)
 }
 
 const PageTemplate = `
@@ -184,40 +221,36 @@ func (ev sortedEvents) Less(i, j int) bool {
 	return ev[i].Start.Before(ev[j].Start)
 }
 
+func loadEvents(path string) ([]Event, error) {
+	fp, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer fp.Close()
+	events := []Event{}
+	err = json.NewDecoder(fp).Decode(&events)
+	return events, err
+}
+
 var (
-	crawlCmd     = app.Command("crawl", "crawl brest.fr agenda")
-	crawlPathArg = crawlCmd.Arg("path", "output HTML path").Required().String()
+	formatCmd     = app.Command("format", "write agent events as HTML")
+	formatJsonArg = formatCmd.Arg("json", "input JSON path").Required().String()
+	formatPathArg = formatCmd.Arg("path", "output HTML path").Required().String()
 )
 
-func crawlFn() error {
-	outPath := *crawlPathArg
-
-	client := &http.Client{
-		Timeout: 30 * time.Second,
+func formatFn() error {
+	outPath := *formatPathArg
+	jsonPath := *formatJsonArg
+	events, err := loadEvents(jsonPath)
+	if err != nil {
+		return err
 	}
-	base := "https://www.brest.fr"
-	path := "/actus-et-agenda/agenda-132.html"
-	events := []Event{}
-	for {
-		url := base + path
-		fmt.Println("GET", url)
-		p, err := getPage(client, url, base)
-		if err != nil {
-			return err
-		}
-		path = p.Next
-		events = append(events, p.Events...)
-		if path == "" {
-			break
-		}
-		fmt.Println(base + path)
-	}
+	sort.Sort(sortedEvents(events))
 	fp, err := os.Create(outPath)
 	if err != nil {
 		return err
 	}
 	defer fp.Close()
-	sort.Sort(sortedEvents(events))
 	return writeHtml(fp, events)
 }
 
@@ -230,6 +263,8 @@ func dispatch() error {
 	switch cmd {
 	case crawlCmd.FullCommand():
 		return crawlFn()
+	case formatCmd.FullCommand():
+		return formatFn()
 	}
 	return fmt.Errorf("unknown command: %s", cmd)
 }
