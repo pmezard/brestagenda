@@ -138,8 +138,8 @@ const PageTemplate = `
 	{{range .Before}}
 	<tr>
 		<td><a href="{{.Link}}">link</a></td>
-		<td>{{.Start}}</td>
-		<td>{{.End}}</td>
+		<td style="white-space:nowrap">{{.Start}}</td>
+		<td style="white-space:nowrap">{{.End}}</td>
 		<td>{{.Weekday}}</td>
 		<td>{{.DeltaStr}}</td>
 		<td>{{.Title}}</td>
@@ -153,8 +153,8 @@ const PageTemplate = `
 	{{range .After}}
 	<tr>
 		<td><a href="{{.Link}}">link</a></td>
-		<td>{{.Start}}</td>
-		<td>{{.End}}</td>
+		<td style="white-space:nowrap">{{.Start}}</td>
+		<td style="white-space:nowrap">{{.End}}</td>
 		<td>{{.Weekday}}</td>
 		<td>{{.DeltaStr}}</td>
 		<td>{{.Title}}</td>
