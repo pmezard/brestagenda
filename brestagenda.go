@@ -156,8 +156,9 @@ const PageTemplate = `
 	{{range .Before}}
 	<tr>
 		<td style="white-space:nowrap">{{.Start}}</td>
+		<td>→</td>
 		<td style="white-space:nowrap">{{.End}}</td>
-		<td>{{.Weekday}}</td>
+		<td>[{{.Weekday}}]</td>
 		<td>{{.DeltaStr}}</td>
 		<td><a href="{{.Link}}">{{.Title}}</a></td>
 	</tr>
@@ -170,8 +171,9 @@ const PageTemplate = `
 	{{range .After}}
 	<tr>
 		<td style="white-space:nowrap">{{.Start}}</td>
+		<td>→</td>
 		<td style="white-space:nowrap">{{.End}}</td>
-		<td>{{.Weekday}}</td>
+		<td>[{{.Weekday}}]</td>
 		<td>{{.DeltaStr}}</td>
 		<td><a href="{{.Link}}">{{.Title}}</a></td>
 	</tr>
@@ -242,16 +244,19 @@ func writeHtml(w io.Writer, events []Event) error {
 		if !ev.End.IsZero() {
 			endDate = ev.End.Add(24 * time.Hour)
 		}
+		endDateIn := endDate.Add(-24 * time.Hour)
 		if !now.Before(endDate) {
 			continue
 		}
 		baseDate := startDate
+		relDate := baseDate
 		mult := 1
 		if startDate.Before(now) {
-			baseDate = endDate
+			relDate = endDate
+			baseDate = endDateIn
 			mult = -1
 		}
-		delta := mult * int(baseDate.Sub(now).Hours()/24)
+		delta := mult * int(relDate.Sub(now).Hours()/24)
 		deltaStr := ""
 		if delta != 0 {
 			deltaStr = formatDuration(delta)
@@ -259,11 +264,11 @@ func writeHtml(w io.Writer, events []Event) error {
 		entry := HtmlEntry{
 			Link:     ev.Link,
 			Start:    ev.Start.Format("2006-01-02"),
-			End:      endDate.Format("2006-01-02"),
+			End:      endDateIn.Format("2006-01-02"),
 			DeltaStr: deltaStr,
 			Delta:    delta,
 			Title:    ev.Title,
-			Weekday:  Weekdays[int(baseDate.Weekday())],
+			Weekday:  Weekdays[int(relDate.Weekday())],
 		}
 		if !startDate.Before(now) {
 			entries.After = append(entries.After, entry)
