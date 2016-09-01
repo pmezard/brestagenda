@@ -133,17 +133,33 @@ const PageTemplate = `
 <header>
 	<meta charset="utf-8">
 	<title>Agenda Brest</title>
+	<style>
+	a:link {
+		text-decoration: none;
+	}
+
+	a:visited {
+		text-decoration: none;
+	}
+
+	a:hover {
+		text-decoration: underline;
+	}
+
+	a:active {
+			text-decoration: underline;
+	}
+	</style>
 </header>
 <body>
 <table>
 	{{range .Before}}
 	<tr>
-		<td><a href="{{.Link}}">link</a></td>
 		<td style="white-space:nowrap">{{.Start}}</td>
 		<td style="white-space:nowrap">{{.End}}</td>
 		<td>{{.Weekday}}</td>
 		<td>{{.DeltaStr}}</td>
-		<td>{{.Title}}</td>
+		<td><a href="{{.Link}}">{{.Title}}</a></td>
 	</tr>
 	{{end}}
 	{{if .HasAfter}}
@@ -153,12 +169,11 @@ const PageTemplate = `
 	{{end}}
 	{{range .After}}
 	<tr>
-		<td><a href="{{.Link}}">link</a></td>
 		<td style="white-space:nowrap">{{.Start}}</td>
 		<td style="white-space:nowrap">{{.End}}</td>
 		<td>{{.Weekday}}</td>
 		<td>{{.DeltaStr}}</td>
-		<td>{{.Title}}</td>
+		<td><a href="{{.Link}}">{{.Title}}</a></td>
 	</tr>
 	{{end}}
 </table>
