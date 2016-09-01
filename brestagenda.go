@@ -132,6 +132,7 @@ const PageTemplate = `
 <html>
 <header>
 	<meta charset="utf-8">
+	<title>Agenda Brest</title>
 </header>
 <body>
 <table>
