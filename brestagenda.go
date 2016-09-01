@@ -214,10 +214,18 @@ func writeHtml(w io.Writer, events []Event) error {
 	now = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)
 	entries := Entries{}
 	for _, ev := range events {
-		baseDate := ev.Start
+		startDate := ev.Start
+		endDate := ev.Start.Add(24 * time.Hour)
+		if !ev.End.IsZero() {
+			endDate = ev.End.Add(24 * time.Hour)
+		}
+		if !now.Before(endDate) {
+			continue
+		}
+		baseDate := startDate
 		mult := 1
-		if !ev.Start.After(now) && !ev.End.IsZero() {
-			baseDate = ev.End
+		if startDate.Before(now) {
+			baseDate = endDate
 			mult = -1
 		}
 		delta := mult * int(baseDate.Sub(now).Hours()/24)
@@ -228,15 +236,13 @@ func writeHtml(w io.Writer, events []Event) error {
 		entry := HtmlEntry{
 			Link:     ev.Link,
 			Start:    ev.Start.Format("2006-01-02"),
+			End:      endDate.Format("2006-01-02"),
 			DeltaStr: deltaStr,
 			Delta:    delta,
 			Title:    ev.Title,
 			Weekday:  Weekdays[int(baseDate.Weekday())],
 		}
-		if !ev.End.IsZero() {
-			entry.End = ev.End.Format("2006-01-02")
-		}
-		if ev.Start.After(now) {
+		if !startDate.Before(now) {
 			entries.After = append(entries.After, entry)
 		} else {
 			entries.Before = append(entries.Before, entry)
