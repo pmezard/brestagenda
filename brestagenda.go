@@ -213,6 +213,14 @@ var Weekdays = []string{
 	"Sa",
 }
 
+func formatDuration(days int) string {
+	if days > 30 || days < -30 {
+		return fmt.Sprintf("%+dm", days/30)
+	} else {
+		return fmt.Sprintf("%+dj", days)
+	}
+}
+
 func writeHtml(w io.Writer, events []Event) error {
 	t, err := template.New("html").Parse(PageTemplate)
 	if err != nil {
@@ -246,7 +254,7 @@ func writeHtml(w io.Writer, events []Event) error {
 		delta := mult * int(baseDate.Sub(now).Hours()/24)
 		deltaStr := ""
 		if delta != 0 {
-			deltaStr = fmt.Sprintf("%+dj", delta)
+			deltaStr = formatDuration(delta)
 		}
 		entry := HtmlEntry{
 			Link:     ev.Link,
