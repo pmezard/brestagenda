@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"sort"
 	"strings"
@@ -24,10 +25,9 @@ type Event struct {
 	End      time.Time
 }
 
-func extractEvents(doc *goquery.Document, baseUrl string) ([]Event, error) {
+func extractEvents(doc *goquery.Document, baseUrl *url.URL) ([]Event, error) {
 	timeLayout := "2006-01-02"
 
-	var err error
 	events := []Event{}
 	items := doc.Find("article[class~='listItem']")
 	for i := range items.Nodes {
@@ -36,7 +36,11 @@ func extractEvents(doc *goquery.Document, baseUrl string) ([]Event, error) {
 		desc := item.Find("div[class~='chapeau']").First().Text()
 		cat := item.Find("p[class='category']").First().Text()
 		link, _ := item.Find("a[class='linkView']").First().Attr("href")
-		link = baseUrl + link
+		relUrl, err := url.Parse(link)
+		if err != nil {
+			return nil, err
+		}
+		relUrl = baseUrl.ResolveReference(relUrl)
 		dates := item.Find("p[class='date'] time")
 		start, _ := dates.Eq(0).Attr("datetime")
 		end, _ := dates.Eq(1).Attr("datetime")
@@ -44,7 +48,7 @@ func extractEvents(doc *goquery.Document, baseUrl string) ([]Event, error) {
 			Title:    strings.TrimSpace(title),
 			Desc:     strings.TrimSpace(desc),
 			Category: strings.TrimSpace(cat),
-			Link:     link,
+			Link:     relUrl.String(),
 		}
 		ev.Start, err = time.Parse(timeLayout, start)
 		if err != nil {
@@ -66,8 +70,8 @@ type Page struct {
 	Next   string
 }
 
-func getPage(client *http.Client, url, base string) (*Page, error) {
-	rsp, err := client.Get(url)
+func getPage(client *http.Client, url, base *url.URL) (*Page, error) {
+	rsp, err := client.Get(url.String())
 	if err != nil {
 		return nil, err
 	}
@@ -84,10 +88,10 @@ func getPage(client *http.Client, url, base string) (*Page, error) {
 		return nil, err
 	}
 	s := doc.Find("link[rel='next']").First()
-	url, _ = s.Attr("href")
+	u, _ := s.Attr("href")
 	page := Page{
 		Events: events,
-		Next:   url,
+		Next:   u,
 	}
 	return &page, nil
 }
@@ -103,13 +107,20 @@ func crawlFn() error {
 	client := &http.Client{
 		Timeout: 30 * time.Second,
 	}
-	base := "https://www.brest.fr"
+	baseUrl, err := url.Parse("https://www.brest.fr")
+	if err != nil {
+		return err
+	}
 	path := "/actus-et-agenda/agenda-132.html"
 	events := []Event{}
 	for {
-		url := base + path
-		fmt.Println("GET", url)
-		p, err := getPage(client, url, base)
+		u, err := url.Parse(path)
+		if err != nil {
+			return err
+		}
+		u = baseUrl.ResolveReference(u)
+		fmt.Println("GET", u)
+		p, err := getPage(client, u, baseUrl)
 		if err != nil {
 			return err
 		}
@@ -118,7 +129,9 @@ func crawlFn() error {
 		if path == "" {
 			break
 		}
-		fmt.Println(base + path)
+	}
+	if len(events) == 0 {
+		return fmt.Errorf("no event found")
 	}
 	fp, err := os.Create(outPath)
 	if err != nil {
