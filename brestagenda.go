@@ -65,6 +65,8 @@ func extractEvents(doc *goquery.Document, baseUrl *url.URL) ([]Event, error) {
 	return events, nil
 }
 
+var ServerError = fmt.Errorf("server error")
+
 type Page struct {
 	Events []Event
 	Next   string
@@ -77,6 +79,10 @@ func getPage(client *http.Client, url, base *url.URL) (*Page, error) {
 	}
 	defer rsp.Body.Close()
 	if rsp.StatusCode != 200 {
+		if rsp.StatusCode == 500 {
+			// Cannot do anything about it, try to generate with what we got.
+			return nil, ServerError
+		}
 		return nil, fmt.Errorf("GET got %d", rsp.StatusCode)
 	}
 	doc, err := goquery.NewDocumentFromReader(rsp.Body)
@@ -111,7 +117,8 @@ func crawlFn() error {
 	if err != nil {
 		return err
 	}
-	path := "/actus-et-agenda/agenda-132.html"
+	var crawlErr error
+	path := "/actus-agenda/agenda-132.html"
 	events := []Event{}
 	for {
 		u, err := url.Parse(path)
@@ -122,6 +129,10 @@ func crawlFn() error {
 		fmt.Println("GET", u)
 		p, err := getPage(client, u, baseUrl)
 		if err != nil {
+			if err == ServerError {
+				crawlErr = err
+				break
+			}
 			return err
 		}
 		path = p.Next
@@ -138,7 +149,11 @@ func crawlFn() error {
 		return err
 	}
 	defer fp.Close()
-	return json.NewEncoder(fp).Encode(&events)
+	err = json.NewEncoder(fp).Encode(&events)
+	if err != nil {
+		return err
+	}
+	return crawlErr
 }
 
 const PageTemplate = `
