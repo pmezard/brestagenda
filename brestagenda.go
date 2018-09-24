@@ -1,12 +1,15 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"text/template"
@@ -72,7 +75,9 @@ type Page struct {
 	Next   string
 }
 
-func getPage(client *http.Client, url, base *url.URL) (*Page, error) {
+func getPage(client *http.Client, url, base *url.URL, dumpDir string, pageNum int) (
+	*Page, error) {
+
 	rsp, err := client.Get(url.String())
 	if err != nil {
 		return nil, err
@@ -85,7 +90,21 @@ func getPage(client *http.Client, url, base *url.URL) (*Page, error) {
 		}
 		return nil, fmt.Errorf("GET got %d", rsp.StatusCode)
 	}
-	doc, err := goquery.NewDocumentFromReader(rsp.Body)
+	var r io.Reader = rsp.Body
+	if dumpDir != "" {
+		path := filepath.Join(dumpDir, fmt.Sprintf("%d.html", pageNum))
+		fmt.Println("writing", path)
+		data, err := ioutil.ReadAll(rsp.Body)
+		if err != nil {
+			return nil, err
+		}
+		err = ioutil.WriteFile(path, data, 0644)
+		if err != nil {
+			return nil, err
+		}
+		r = bytes.NewReader(data)
+	}
+	doc, err := goquery.NewDocumentFromReader(r)
 	if err != nil {
 		return nil, err
 	}
@@ -105,10 +124,19 @@ func getPage(client *http.Client, url, base *url.URL) (*Page, error) {
 var (
 	crawlCmd     = app.Command("crawl", "crawl brest.fr agenda")
 	crawlPathArg = crawlCmd.Arg("path", "output JSON path").Required().String()
+	crawlDumpDir = crawlCmd.Flag("dump-dir", "optionally dump page content").String()
 )
 
 func crawlFn() error {
 	outPath := *crawlPathArg
+	dumpDir := ""
+	if crawlDumpDir != nil {
+		dumpDir = *crawlDumpDir
+		err := os.MkdirAll(dumpDir, 0755)
+		if err != nil {
+			return err
+		}
+	}
 
 	client := &http.Client{
 		Timeout: 30 * time.Second,
@@ -117,9 +145,9 @@ func crawlFn() error {
 	if err != nil {
 		return err
 	}
-	var crawlErr error
 	path := "/actus-agenda/agenda-132.html"
 	events := []Event{}
+	pages := 0
 	for {
 		u, err := url.Parse(path)
 		if err != nil {
@@ -127,10 +155,11 @@ func crawlFn() error {
 		}
 		u = baseUrl.ResolveReference(u)
 		fmt.Println("GET", u)
-		p, err := getPage(client, u, baseUrl)
+		p, err := getPage(client, u, baseUrl, dumpDir, pages)
 		if err != nil {
 			if err == ServerError {
-				crawlErr = err
+				// Ignore 500 errors for now. There is one happening at each
+				// crawl and I cannot do anything about it.
 				break
 			}
 			return err
@@ -140,6 +169,7 @@ func crawlFn() error {
 		if path == "" {
 			break
 		}
+		pages += 1
 	}
 	if len(events) == 0 {
 		return fmt.Errorf("no event found")
@@ -153,7 +183,7 @@ func crawlFn() error {
 	if err != nil {
 		return err
 	}
-	return crawlErr
+	return nil
 }
 
 const PageTemplate = `
