@@ -32,19 +32,19 @@ func extractEvents(doc *goquery.Document, baseUrl *url.URL) ([]Event, error) {
 	timeLayout := "2006-01-02"
 
 	events := []Event{}
-	items := doc.Find("article[class~='listItem']")
+	items := doc.Find("article[class~='list-type-1__item']")
 	for i := range items.Nodes {
 		item := items.Eq(i)
-		title := item.Find("h3[class~='title']").First().Text()
-		desc := item.Find("div[class~='chapeau']").First().Text()
-		cat := item.Find("p[class='category']").First().Text()
-		link, _ := item.Find("a[class='linkView']").First().Attr("href")
+		title := item.Find("h2").First().Text()
+		desc := item.Find("p[class~='teaser-1']").First().Text()
+		cat := item.Find("p[class~='category']").First().Text()
+		link, _ := item.Find("a[class='link-bloc']").First().Attr("href")
 		relUrl, err := url.Parse(link)
 		if err != nil {
 			return nil, err
 		}
 		relUrl = baseUrl.ResolveReference(relUrl)
-		dates := item.Find("p[class='date'] time")
+		dates := item.Find("p[class='date-2'] time")
 		start, _ := dates.Eq(0).Attr("datetime")
 		end, _ := dates.Eq(1).Attr("datetime")
 		ev := Event{
@@ -130,7 +130,7 @@ var (
 func crawlFn() error {
 	outPath := *crawlPathArg
 	dumpDir := ""
-	if crawlDumpDir != nil {
+	if crawlDumpDir != nil && len(*crawlDumpDir) > 0 {
 		dumpDir = *crawlDumpDir
 		err := os.MkdirAll(dumpDir, 0755)
 		if err != nil {
